@@ -2,6 +2,7 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { ArrowUpRight, LayoutGrid, LogOut, Plus, Tags, User } from '@lucide/svelte';
+	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 
 	let { data, children } = $props();
 
@@ -48,6 +49,7 @@
 			</a>
 			<div class="account">
 				<span class="email" title={data.email}>{data.email}</span>
+				<ThemeToggle />
 				<button class="btn btn-ghost btn-icon btn-sm" onclick={signOut} aria-label="Sign out" title="Sign out">
 					<LogOut size={16} />
 				</button>
@@ -164,6 +166,9 @@ select id from auth.users where email = '{data.email}';</code
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.shell {
+		background: var(--bg-subtle);
 	}
 	.main {
 		min-width: 0;

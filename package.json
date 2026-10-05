@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "admin:create": "node scripts/create-admin.js"
+    "admin:create": "node scripts/create-admin.js",
+    "prepare": "svelte-kit sync || echo ''"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^8.0.0",

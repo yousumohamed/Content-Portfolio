@@ -18,7 +18,8 @@
 	import { slugify, formatDate } from '../../format';
 	import { formatBytes, formatDuration, publicUrl } from '../../media';
 	import { toast } from '../../toast.svelte';
-	import { extOf, kindOf, prepareFile, uploadObject } from '../../upload';
+	import { extOf, kindOf, prepareFile, rasterize, uploadObject } from '../../upload';
+	import { PUBLIC_MAX_UPLOAD_MB } from '$app/env/public';
 	import type { Category, MediaKind, Post, PostStatus } from '../../types';
 
 	interface Props {
@@ -44,7 +45,7 @@
 		/** local object URL used while uploading */
 		preview: string | null;
 		name: string;
-		state: 'processing' | 'uploading' | 'ready' | 'error';
+		state: 'processing' | 'compressing' | 'uploading' | 'ready' | 'error';
 		progress: number;
 		error?: string;
 		/** stored in the database already */
@@ -86,7 +87,13 @@
 	let dragIndex = $state<number | null>(null);
 	let fileInput = $state<HTMLInputElement>();
 
-	const uploading = $derived(items.some((i) => i.state === 'processing' || i.state === 'uploading'));
+	const MAX_UPLOAD_BYTES = PUBLIC_MAX_UPLOAD_MB * 1024 * 1024;
+	/** original files kept so a failed upload can be retried */
+	const sources = new Map<string, File>();
+
+	const uploading = $derived(
+		items.some((i) => i.state === 'processing' || i.state === 'compressing' || i.state === 'uploading')
+	);
 	const readyItems = $derived(items.filter((i) => i.state === 'ready'));
 	const effectiveSlug = $derived(slugTouched ? slug : slugify(title));
 
@@ -123,6 +130,7 @@
 			touch();
 			// `items` is a deep proxy — grab the reactive version to mutate.
 			const live = items[items.length - 1];
+			sources.set(item.id, file);
 			processAndUpload(live, file);
 		}
 	}
@@ -140,11 +148,14 @@
 			item.width = prepared.width;
 			item.height = prepared.height;
 			item.duration = prepared.duration;
+
+			const body = await fitToLimit(item, file);
 			item.state = 'uploading';
+			item.progress = 0;
 
 			const token = await accessToken(supabase);
 			const base = `posts/${postId}/${item.id}`;
-			const mainPath = `${base}.${extOf(file)}`;
+			const mainPath = `${base}.${extOf(body)}`;
 
 			// Small derived files first (fast), then the original with progress.
 			if (prepared.thumb) {
@@ -159,13 +170,14 @@
 			}
 			await uploadObject({
 				path: mainPath,
-				body: file,
+				body,
 				token,
 				onProgress: (f) => (item.progress = f)
 			});
 			item.path = mainPath;
 			item.progress = 1;
 			item.state = 'ready';
+			sources.delete(item.id);
 			// removed while uploading — don't leave the files behind
 			if (!items.includes(item)) removeObjects(supabase, [item.path, item.thumb_path, item.poster_path]);
 		} catch (e) {
@@ -176,8 +188,53 @@
 		}
 	}
 
+	/** Shrink files that exceed the Supabase per-file limit (videos are re-encoded in the browser). */
+	async function fitToLimit(item: Item, file: File): Promise<File> {
+		if (file.size <= MAX_UPLOAD_BYTES) return file;
+
+		item.state = 'compressing';
+		item.progress = 0;
+		let out: File;
+
+		if (item.kind === 'video') {
+			const { compressVideo } = await import('../../compress');
+			const res = await compressVideo(file, MAX_UPLOAD_BYTES * 0.9, (f) => (item.progress = f));
+			out = res.file;
+			item.width ??= res.width;
+			item.height ??= res.height;
+			item.duration ??= res.duration;
+		} else {
+			const bitmap = await createImageBitmap(file);
+			const blob = await rasterize(bitmap, bitmap.width, bitmap.height, 4096);
+			bitmap.close();
+			if (!blob) throw new Error('Could not process image');
+			const ext = blob.type === 'image/webp' ? '.webp' : '.jpg';
+			out = new File([blob], file.name.replace(/\.[^.]+$/, '') + ext, { type: blob.type });
+		}
+
+		if (out.size > MAX_UPLOAD_BYTES) {
+			throw new Error(
+				`Still ${formatBytes(out.size)} after optimizing (limit ${formatBytes(MAX_UPLOAD_BYTES)}) — trim it or raise the limit`
+			);
+		}
+		item.size_bytes = out.size;
+		item.mime = out.type;
+		item.name = out.name;
+		return out;
+	}
+
+	function retry(item: Item) {
+		const file = sources.get(item.id);
+		if (!file) return;
+		item.state = 'processing';
+		item.error = undefined;
+		item.progress = 0;
+		processAndUpload(item, file);
+	}
+
 	function removeItem(index: number) {
 		const [item] = items.splice(index, 1);
+		sources.delete(item.id);
 		if (item.preview) URL.revokeObjectURL(item.preview);
 		if (item.persisted) removed.push(item);
 		else removeObjects(supabase, [item.path, item.thumb_path, item.poster_path]);
@@ -412,7 +469,7 @@
 								{#if item.kind === 'video'}
 									<span class="vid"><Play size={10} fill="currentColor" strokeWidth={0} />{formatDuration(item.duration)}</span>
 								{/if}
-								{#if item.state === 'processing' || item.state === 'uploading'}
+								{#if item.state === 'processing' || item.state === 'compressing' || item.state === 'uploading'}
 									<div class="progress"><span style:width="{Math.round(item.progress * 100)}%"></span></div>
 								{/if}
 								{#if i === 0 && item.state === 'ready'}<span class="cover-tag">Cover</span>{/if}
@@ -423,8 +480,10 @@
 									<span class="fname" title={item.name}>{item.name}</span>
 									<span class="fmeta">
 										{#if item.state === 'processing'}Preparing…
-										{:else if item.state === 'uploading'}{Math.round(item.progress * 100)}%
+										{:else if item.state === 'compressing'}Optimizing for web · {Math.round(item.progress * 100)}%
+										{:else if item.state === 'uploading'}Uploading · {Math.round(item.progress * 100)}%
 										{:else if item.state === 'error'}<span class="err">{item.error}</span>
+											{#if sources.has(item.id)}<button class="retry" onclick={() => retry(item)}>Retry</button>{/if}
 										{:else}{[item.width && item.height ? `${item.width}×${item.height}` : '', formatBytes(item.size_bytes)].filter(Boolean).join(' · ')}{/if}
 									</span>
 								</div>
@@ -715,6 +774,13 @@
 	}
 	.fmeta .err {
 		color: var(--danger);
+	}
+	.retry {
+		margin-left: 8px;
+		font-weight: 600;
+		color: var(--ink);
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	.alt {
 		min-height: 36px;

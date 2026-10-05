@@ -3,6 +3,7 @@
 	import { Search, X } from '@lucide/svelte';
 	import type { Profile } from '../types';
 	import { publicUrl } from '../media';
+	import ThemeToggle from './ThemeToggle.svelte';
 
 	let { profile }: { profile: Profile } = $props();
 
@@ -56,6 +57,7 @@
 			</button>
 			<a href="/" class="nav-link" aria-current={page.url.pathname === '/' ? 'page' : undefined}>Work</a>
 			<a href="/about" class="nav-link" aria-current={page.url.pathname === '/about' ? 'page' : undefined}>About</a>
+			<ThemeToggle />
 			{#if profile.email}
 				<a class="btn btn-primary btn-sm contact" href="mailto:{profile.email}">Get in touch</a>
 			{/if}

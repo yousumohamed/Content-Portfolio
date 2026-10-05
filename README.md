@@ -42,6 +42,7 @@ A public, Pinterest/Behance-style gallery for your photos and videos, with a pri
 
 ## Notes
 
-- Supabase's default upload limit is 50 MB per file (free plan). Raise it under **Storage → Settings** on a paid plan if you upload long videos.
+- Supabase limits uploads to 50 MB per file on the free plan. Videos over that limit are **automatically compressed in your browser** (MP4, resolution and bitrate chosen to fit). Big images are resized to 4096px. If you move to a paid plan and raise the limit under **Storage → Settings**, set `PUBLIC_MAX_UPLOAD_MB` in `.env` to match, and big files will upload untouched.
+- The site opens in light mode. Visitors can switch to dark with the moon icon, and their choice is remembered.
 - `adapter-auto` works on Vercel, Netlify and Cloudflare. Set `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_ANON_KEY` as environment variables there.
 # Content-Portfolio
