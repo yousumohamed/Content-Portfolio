@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, preloadData, pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import { LoaderCircle, MapPin, X } from '@lucide/svelte';
+	import { LoaderCircle, Mail, MapPin, X } from '@lucide/svelte';
 	import MasonryGrid from '#lib/components/MasonryGrid.svelte';
 	import PostCard from '#lib/components/PostCard.svelte';
 	import PostView from '#lib/components/PostView.svelte';
@@ -97,6 +97,12 @@
 			<dl class="facts">
 				{#if profile.location}
 					<div><dt class="sr-only">Based in</dt><dd><MapPin size={15} />{profile.location}</dd></div>
+				{/if}
+				{#if profile.email}
+					<div>
+						<dt class="sr-only">Email</dt>
+						<dd><Mail size={15} /><a href="mailto:{profile.email}">{profile.email}</a></dd>
+					</div>
 				{/if}
 				<div><dt class="sr-only">Work</dt><dd>{plural(data.totalPosts, 'project')}</dd></div>
 				{#each links.slice(0, 3) as l (l.key)}

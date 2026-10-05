@@ -41,7 +41,7 @@
 	onmouseleave={() => (previewing = false)}
 	data-sveltekit-preload-data="tap"
 >
-	<div class="frame" style:aspect-ratio="{w} / {h}">
+	<div class="frame media-edge" style:aspect-ratio="{w} / {h}">
 		{#if thumb}
 			<img
 				src={thumb}
@@ -146,6 +146,12 @@
 	}
 	.card:hover .shade {
 		opacity: 1;
+	}
+	.frame {
+		transition: box-shadow 0.3s var(--ease);
+	}
+	.card:hover .frame {
+		box-shadow: 0 10px 28px -12px rgb(0 0 0 / 0.28);
 	}
 	.badges {
 		position: absolute;

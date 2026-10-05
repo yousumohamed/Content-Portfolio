@@ -124,7 +124,7 @@
 
 	<div class="media-stack">
 		{#each post.media as m, i (m.id)}
-			<figure class="media" style:aspect-ratio={m.width && m.height ? `${m.width} / ${m.height}` : undefined}>
+			<figure class="media media-edge" style:aspect-ratio={m.width && m.height ? `${m.width} / ${m.height}` : undefined}>
 				{#if m.kind === 'image'}
 					<button class="zoom" onclick={() => openLightbox(m)} aria-label="View full size">
 						<img

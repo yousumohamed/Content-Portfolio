@@ -459,7 +459,7 @@
 						>
 							<span class="handle" aria-hidden="true"><GripVertical size={16} /></span>
 
-							<div class="preview" style:aspect-ratio={item.width && item.height ? `${item.width}/${item.height}` : '4/3'}>
+							<div class="preview media-edge" style:aspect-ratio={item.width && item.height ? `${item.width}/${item.height}` : '4/3'}>
 								{#if src}
 									<img {src} alt="" />
 								{:else if item.kind === 'video' && (item.preview || item.path)}

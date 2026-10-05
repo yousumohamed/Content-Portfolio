@@ -10,6 +10,7 @@
 	<div class="container inner">
 		<div class="left">
 			<span class="name">{profile.name}</span>
+			{#if profile.email}<a class="email" href="mailto:{profile.email}">{profile.email}</a>{/if}
 			<span class="muted">© {new Date().getFullYear()} · All work shown is original.</span>
 		</div>
 		{#if links.length}
@@ -61,5 +62,11 @@
 	}
 	a:hover {
 		color: var(--ink);
+	}
+	.email {
+		color: var(--ink);
+		text-decoration: underline;
+		text-decoration-color: var(--line-strong);
+		text-underline-offset: 3px;
 	}
 </style>

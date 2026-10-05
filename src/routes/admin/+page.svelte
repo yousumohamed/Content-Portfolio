@@ -98,7 +98,7 @@
 		{#each filtered as post (post.id)}
 			{@const thumb = publicUrl(post.cover_thumb_path ?? (post.cover_kind === 'image' ? post.cover_path : null))}
 			<li class="row" class:busy={busy === post.id}>
-				<a class="thumb" href="/admin/posts/{post.id}" aria-label="Edit {post.title}">
+				<a class="thumb media-edge" href="/admin/posts/{post.id}" aria-label="Edit {post.title}">
 					{#if thumb}
 						<img src={thumb} alt="" loading="lazy" />
 					{/if}

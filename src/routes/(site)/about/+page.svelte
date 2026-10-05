@@ -15,7 +15,7 @@
 </svelte:head>
 
 <div class="container about">
-	<aside class="portrait">
+	<aside class="portrait media-edge">
 		{#if profile.avatar_path}
 			<img src={publicUrl(profile.avatar_path)} alt={profile.name} />
 		{:else}
@@ -86,6 +86,7 @@
 	.portrait {
 		position: sticky;
 		top: calc(var(--header-h) + 24px);
+		border-radius: var(--radius-lg);
 	}
 	.portrait img,
 	.placeholder {
