@@ -9,6 +9,7 @@
 		ArrowUpRight,
 		CloudUpload,
 		GripVertical,
+		ImagePlus,
 		LoaderCircle,
 		Play,
 		Trash,
@@ -18,7 +19,7 @@
 	import { slugify, formatDate } from '../../format';
 	import { formatBytes, formatDuration, publicUrl } from '../../media';
 	import { toast } from '../../toast.svelte';
-	import { extOf, kindOf, prepareFile, rasterize, uploadObject } from '../../upload';
+	import { extOf, kindOf, POSTER_WIDTH, prepareFile, rasterize, THUMB_WIDTH, uploadObject } from '../../upload';
 	import { PUBLIC_MAX_UPLOAD_MB } from '$app/env/public';
 	import type { Category, MediaKind, Post, PostStatus } from '../../types';
 
@@ -88,6 +89,14 @@
 	let fileInput = $state<HTMLInputElement>();
 
 	const MAX_UPLOAD_BYTES = PUBLIC_MAX_UPLOAD_MB * 1024 * 1024;
+	/** files replaced by a custom thumbnail — deleted once the post is saved */
+	let staleFiles: string[] = [];
+	/** custom thumbnails uploaded this session — deleted if the edit is discarded */
+	let pendingFiles: string[] = [];
+	let thumbInput = $state<HTMLInputElement>();
+	let thumbTarget: Item | null = null;
+	let thumbBusy = $state<string | null>(null);
+
 	/** original files kept so a failed upload can be retried */
 	const sources = new Map<string, File>();
 
@@ -223,6 +232,51 @@
 		return out;
 	}
 
+	function pickThumbnail(item: Item) {
+		thumbTarget = item;
+		thumbInput?.click();
+	}
+
+	/** Replace a video's auto-generated frame with a custom cover image. */
+	async function setThumbnail(item: Item, file: File) {
+		if (!file.type.startsWith('image/')) return toast('Choose an image file', 'error');
+		thumbBusy = item.id;
+		try {
+			const bitmap = await createImageBitmap(file);
+			const poster = await rasterize(bitmap, bitmap.width, bitmap.height, POSTER_WIDTH);
+			const thumb = await rasterize(bitmap, bitmap.width, bitmap.height, THUMB_WIDTH);
+			bitmap.close();
+			if (!poster || !thumb) throw new Error('Could not process image');
+
+			const token = await accessToken(supabase);
+			// unique names so browsers/CDN never show the old cached cover
+			const base = `posts/${postId}/${item.id}-cover-${Date.now().toString(36)}`;
+			const posterPath = `${base}-poster.${extOf(poster, 'webp')}`;
+			const thumbPath = `${base}-thumb.${extOf(thumb, 'webp')}`;
+			await uploadObject({ path: posterPath, body: poster, token });
+			await uploadObject({ path: thumbPath, body: thumb, token });
+
+			const old = [item.poster_path, item.thumb_path].filter((p): p is string => Boolean(p));
+			// an unsaved custom cover from earlier this session can go right away;
+			// a saved one is still referenced by the database until we save
+			const oldUnsaved = old.filter((p) => pendingFiles.includes(p) || !item.persisted);
+			const oldSaved = old.filter((p) => !oldUnsaved.includes(p));
+			pendingFiles = pendingFiles.filter((p) => !old.includes(p));
+			pendingFiles.push(posterPath, thumbPath);
+			staleFiles.push(...oldSaved);
+			removeObjects(supabase, oldUnsaved);
+
+			item.poster_path = posterPath;
+			item.thumb_path = thumbPath;
+			touch();
+			toast('Thumbnail updated — save to apply', 'success');
+		} catch (e) {
+			toast((e as Error).message, 'error');
+		} finally {
+			thumbBusy = null;
+		}
+	}
+
 	function retry(item: Item) {
 		const file = sources.get(item.id);
 		if (!file) return;
@@ -327,6 +381,9 @@
 				if (error) throw new Error(error.message);
 			}
 			for (const m of items) if (m.state === 'ready') m.persisted = true;
+			if (staleFiles.length) await removeObjects(supabase, staleFiles);
+			staleFiles = [];
+			pendingFiles = [];
 
 			status = nextStatus;
 			slug = effectiveSlug;
@@ -370,7 +427,10 @@
 		// discard: clean up files uploaded in this session that were never saved
 		removeObjects(
 			supabase,
-			items.filter((i) => !i.persisted).flatMap((i) => [i.path, i.thumb_path, i.poster_path])
+			[
+				...items.filter((i) => !i.persisted).flatMap((i) => [i.path, i.thumb_path, i.poster_path]),
+				...pendingFiles
+			]
 		);
 	});
 
@@ -436,6 +496,18 @@
 				/>
 			</div>
 
+			<input
+				bind:this={thumbInput}
+				type="file"
+				accept="image/*"
+				hidden
+				onchange={(e) => {
+					const file = e.currentTarget.files?.[0];
+					if (file && thumbTarget) setThumbnail(thumbTarget, file);
+					e.currentTarget.value = '';
+				}}
+			/>
+
 			{#if items.length}
 				<ol class="items">
 					{#each items as item, i (item.id)}
@@ -487,6 +559,17 @@
 										{:else}{[item.width && item.height ? `${item.width}×${item.height}` : '', formatBytes(item.size_bytes)].filter(Boolean).join(' · ')}{/if}
 									</span>
 								</div>
+								{#if item.kind === 'video' && item.state === 'ready'}
+									<button
+										type="button"
+										class="btn btn-sm thumb-btn"
+										onclick={() => pickThumbnail(item)}
+										disabled={thumbBusy === item.id}
+									>
+										{#if thumbBusy === item.id}<LoaderCircle size={14} class="spin" />{:else}<ImagePlus size={14} />{/if}
+										{item.thumb_path ? 'Change thumbnail' : 'Set thumbnail'}
+									</button>
+								{/if}
 								<label class="sr-only" for="alt-{item.id}">Caption / alt text</label>
 								<input
 									id="alt-{item.id}"
@@ -781,6 +864,9 @@
 		color: var(--ink);
 		text-decoration: underline;
 		text-underline-offset: 2px;
+	}
+	.thumb-btn {
+		justify-self: start;
 	}
 	.alt {
 		min-height: 36px;

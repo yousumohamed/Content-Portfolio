@@ -124,7 +124,12 @@
 
 	<div class="media-stack">
 		{#each post.media as m, i (m.id)}
-			<figure class="media media-edge" style:aspect-ratio={m.width && m.height ? `${m.width} / ${m.height}` : undefined}>
+			<figure
+				class="media media-edge"
+				class:sized={m.width && m.height}
+				style:aspect-ratio={m.width && m.height ? `${m.width} / ${m.height}` : undefined}
+				style:--ratio={m.width && m.height ? m.width / m.height : undefined}
+			>
 				{#if m.kind === 'image'}
 					<button class="zoom" onclick={() => openLightbox(m)} aria-label="View full size">
 						<img
@@ -205,11 +210,14 @@
 <style>
 	.post {
 		--measure: 1240px;
+		/* tallest any single image/video may be — keeps portrait media on screen */
+		--media-max-h: min(80vh, 1000px);
 		max-width: var(--measure);
 		margin-inline: auto;
 		padding-block: 40px 0;
 	}
 	.post.overlay {
+		--media-max-h: calc(100vh - 140px);
 		padding-top: 8px;
 	}
 	.head {
@@ -285,8 +293,15 @@
 	.media {
 		position: relative;
 		overflow: hidden;
+		width: 100%;
+		max-height: var(--media-max-h);
+		margin-inline: auto;
 		border-radius: var(--radius);
 		background: var(--placeholder);
+	}
+	/* Known size: derive width from the height cap so the aspect ratio is kept exactly. */
+	.media.sized {
+		width: min(100%, calc(var(--media-max-h) * var(--ratio)));
 	}
 	.media img,
 	.media video {
