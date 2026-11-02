@@ -1,6 +1,13 @@
 # Portfolio — images & video gallery
 
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)](https://kit.svelte.dev/)
+[![Svelte](https://img.shields.io/badge/Svelte-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)](https://svelte.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
 A public, Pinterest/Behance-style gallery for your photos and videos, with a private **Studio** admin to upload and manage posts. SvelteKit 3 + Svelte 5 + Supabase, set in DM Sans.
+
+<img src="image.png" alt="Portfolio homepage" width="100%" />
 
 ## Setup (one time)
 
